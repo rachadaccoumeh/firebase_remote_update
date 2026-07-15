@@ -1,3 +1,15 @@
+## 0.2.0
+
+- **New**: `UpdateGateMode` enum with `nonBlocking` (default) and `blocking` modes.
+- **Breaking**: `UpdateGate` now defaults to `UpdateGateMode.nonBlocking` — the app
+  renders immediately and the update policy is evaluated in the background. If the
+  result is forced, the gate swaps to `forcedBuilder` after evaluation completes.
+- To keep the old behavior (hide the app until the decision is resolved), pass
+  `mode: UpdateGateMode.blocking`.
+- `loadingBuilder` is now only used in `blocking` mode. In `nonBlocking` mode it is
+  ignored.
+- Optional updates and `onDecision` behavior are unchanged.
+
 ## 0.1.0
 
 - Initial release.

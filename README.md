@@ -23,15 +23,33 @@ const config = AppUpdateConfig(
 
 final service = AppUpdateService(config: config); // uses FirebaseRemoteConfig.instance
 
-// Wrap your app:
+// Wrap your app (non-blocking — app renders immediately, evaluation runs in
+// the background):
 UpdateGate(
   service: service,
+  forcedBuilder: (context, decision) => MyUpdateScreen(service: service, decision: decision),
+  child: myHome,
+);
+
+// Or use blocking mode (app hidden behind a loading screen until the decision
+// is resolved):
+UpdateGate(
+  service: service,
+  mode: UpdateGateMode.blocking,
+  loadingBuilder: (context) => MyLoadingScreen(),
   forcedBuilder: (context, decision) => MyUpdateScreen(service: service, decision: decision),
   child: myHome,
 );
 ```
 
 Call `service.startUpdate()` from the update screen's button.
+
+### Modes
+
+| Mode | Behavior | When to use |
+| --- | --- | --- |
+| `nonBlocking` (default) | App renders immediately. If the result is forced, the gate swaps to `forcedBuilder` after evaluation. | Most apps — fastest perceived startup. |
+| `blocking` | App is hidden behind `loadingBuilder` until the decision is resolved. | When you need the decision before any UI is visible (e.g. to avoid a flash of the main screen before a forced update). |
 
 ## Remote Config parameters
 
@@ -52,7 +70,7 @@ Supply a different `AppUpdateConfig`. No code changes. Add it to your
 
 ```yaml
 dependencies:
-  firebase_remote_update: ^0.1.0
+  firebase_remote_update: ^0.2.0
 ```
 
 Or via git:
@@ -62,5 +80,5 @@ dependencies:
   firebase_remote_update:
     git:
       url: https://github.com/rachadaccoumeh/firebase_remote_update.git
-      ref: v0.1.0
+      ref: v0.2.0
 ```
