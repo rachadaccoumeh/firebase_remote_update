@@ -13,10 +13,38 @@ void main() {
       expect(AppVersion.tryParse('1.2.8+128'), const AppVersion(1, 2, 8));
     });
 
+    test('ignores hand-written build suffix from App Store version strings', () {
+      // The iTunes lookup API returns the marketing version verbatim, and
+      // developers sometimes type the build number into it (e.g. "1.4.9 (149)").
+      expect(AppVersion.tryParse('1.4.9 (149)'), const AppVersion(1, 4, 9));
+      expect(AppVersion.tryParse('1.4.9(149)'), const AppVersion(1, 4, 9));
+      expect(AppVersion.tryParse('1.4.9 build 149'), const AppVersion(1, 4, 9));
+      expect(AppVersion.tryParse('1.4.9-beta'), const AppVersion(1, 4, 9));
+      expect(AppVersion.tryParse('  1.4.9  '), const AppVersion(1, 4, 9));
+    });
+
+    test('finds the version anywhere in the string, even with a prefix', () {
+      expect(AppVersion.tryParse('149 1.4.9'), const AppVersion(1, 4, 9));
+      expect(AppVersion.tryParse('(149) 1.4.9'), const AppVersion(1, 4, 9));
+      expect(AppVersion.tryParse('v1.4.9'), const AppVersion(1, 4, 9));
+      expect(AppVersion.tryParse('version 1.4.9'), const AppVersion(1, 4, 9));
+      expect(
+        AppVersion.tryParse('release 1.4.9 build 149'),
+        const AppVersion(1, 4, 9),
+      );
+    });
+
+    test('returns null when two dotted versions make the input ambiguous', () {
+      expect(AppVersion.tryParse('1.4.9 requires iOS 15.6'), isNull);
+      expect(AppVersion.tryParse('1.4.9 1.5.0'), isNull);
+    });
+
     test('returns null for invalid input (so callers fail open)', () {
       expect(AppVersion.tryParse(null), isNull);
       expect(AppVersion.tryParse(''), isNull);
       expect(AppVersion.tryParse('abc'), isNull);
+      expect(AppVersion.tryParse('(149)'), isNull);
+      expect(AppVersion.tryParse('build 149'), isNull);
     });
   });
 

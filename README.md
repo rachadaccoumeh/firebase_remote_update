@@ -63,6 +63,28 @@ Call `service.startUpdate()` from the update screen's button.
 
 Parameter names are configurable via `RemoteConfigKeys`.
 
+## Version string parsing
+
+The iOS store check reads the `version` field from the public iTunes lookup
+API (`https://itunes.apple.com/lookup?id=<appStoreId>&country=<cc>`). That
+field is the **hand-written marketing version** from App Store Connect — not
+the build number, which the public API does not expose.
+
+Since 0.2.1 the parser is tolerant: it finds the dotted version anywhere in
+the string and ignores the text around it. `1.4.9 (149)`, `149 1.4.9`,
+`v1.4.9`, `release 1.4.9 build 149`, and `1.4.9+149` all parse as `1.4.9`.
+Two rules protect users from bad input:
+
+- Two or more dotted versions in one string (e.g. `1.4.9 requires iOS 15.6`)
+  are ambiguous → the parser returns `null` and the gate fails open.
+- A string with no dotted version parses only if it is a pure bare integer
+  (`2` → `2.0.0`); everything else → `null` → fail open.
+
+**Recommendation for releases:** still enter a clean `major.minor.patch`
+version string (e.g. `1.5.0`) in App Store Connect. Do not append the build
+number — apps that ship with a pre-0.2.1 version of this package cannot parse
+the suffix, and their store gate silently stops forcing updates.
+
 ## Reuse in another app
 
 Supply a different `AppUpdateConfig`. No code changes. Add it to your
