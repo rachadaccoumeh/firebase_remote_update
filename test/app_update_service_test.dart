@@ -34,7 +34,10 @@ class _FakeStoreChecker implements StoreAvailabilityChecker {
   final StoreStatus _status;
 
   @override
-  Future<StoreStatus> check(AppVersion minRequiredVersion) async => _status;
+  Future<StoreStatus> check({
+    AppVersion? minRequired,
+    AppVersion? currentVersion,
+  }) async => _status;
 }
 
 const _config = AppUpdateConfig(

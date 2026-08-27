@@ -1,10 +1,10 @@
 name: firebase_remote_update
 description: >-
-  Reusable force/optional update gate for Flutter apps, backed by Firebase
-  Remote Config and guarded by a real store-availability check (Play In-App
-  Update on Android, iTunes lookup on iOS) so users are never locked out of a
-  build that is not actually live.
-version: 0.2.1
+  Force/optional update gate for Flutter apps, backed by Firebase Remote
+  Config. A thin adapter over app_update_gate, guarded by a real
+  store-availability check (Play In-App Update on Android, iTunes lookup on
+  iOS) so users are never locked out of a build that is not actually live.
+version: 0.3.0
 
 environment:
   sdk: ^3.7.2
@@ -14,20 +14,11 @@ dependencies:
   flutter:
     sdk: flutter
 
+  # Source-agnostic core: service, gate widget, controller, store checks.
+  app_update_gate: ^0.1.1
+
   # Policy source (pulls firebase_core transitively).
   firebase_remote_config: ^6.5.3
-
-  # Reads the running app version.
-  package_info_plus: ^10.2.0
-
-  # Opens the store page as a fallback.
-  url_launcher: ^6.3.2
-
-  # iOS store-availability check (iTunes lookup API).
-  http: ^1.6.0
-
-  # Android store-availability check + immediate in-app update.
-  in_app_update: ^4.2.5
 
 repository: https://github.com/rachadaccoumeh/firebase_remote_update
 
@@ -35,3 +26,5 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  # Tests mock the app version via PackageInfo.setMockInitialValues.
+  package_info_plus: ^10.2.0

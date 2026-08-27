@@ -34,3 +34,4 @@ migrate_working_dir/
 coverage/
 # Library packages should not commit pubspec.lock
 pubspec.lock
+pubspec_overrides.yaml

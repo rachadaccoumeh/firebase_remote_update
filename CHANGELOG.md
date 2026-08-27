@@ -1,3 +1,22 @@
+## 0.3.0
+
+**Rebuilt as a thin adapter over `app_update_gate`** — the source-agnostic
+core extracted from this package. The public API (`AppUpdateConfig`,
+`AppUpdateService`, `UpdateGate`, `RemoteConfigKeys`) is unchanged; this
+package now only supplies the Firebase Remote Config policy source
+(`FirebaseRemoteConfigPolicySource`).
+
+- **New**: the core's types are re-exported — `AppUpdateController`
+  (observable status, periodic re-checks, manual checks),
+  `ForcePresentation.onNextNavigation` + `UpdateGateNavigatorObserver`,
+  `UpdatePolicySource`/`HttpUpdatePolicySource`, and `VersionScheme`.
+- **Breaking (edge cases only)**:
+  - Custom `StoreAvailabilityChecker` implementations: `check` now takes
+    named parameters `({AppVersion? minRequired, AppVersion? currentVersion})`.
+  - A bare integer in a Remote Config version value (e.g. `"2"`) is now
+    rejected and fails open; use a dotted version (`"2.0.0"`). This prevents
+    build codes from being misread as huge semantic versions.
+
 ## 0.2.1
 
 - **Fix**: `AppVersion.tryParse` now finds the dotted version anywhere in the

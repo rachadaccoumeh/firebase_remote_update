@@ -5,6 +5,7 @@ A small, reusable force/optional update gate for Flutter apps.
 - **Policy source:** Firebase Remote Config (per-platform min & recommended versions, a global kill switch, an emergency override, and an optional message).
 - **Safety gate:** before forcing, it verifies the target build is actually available on the store — Play In-App Update on Android, iTunes lookup on iOS — so users are never locked out of a build that isn't live yet.
 - **Fails open:** any error (no network, bad config, throttled fetch) results in *no* forced update.
+- **Built on [`app_update_gate`](https://pub.dev/packages/app_update_gate):** since 0.3.0 this package is a thin adapter that adds the Firebase Remote Config policy source on top of the source-agnostic core. The core's extras (observable status, periodic re-checks, navigation-deferred forced screens, HTTP/API policy sources) are re-exported and available from this same import.
 
 ## Why
 
@@ -77,8 +78,9 @@ Two rules protect users from bad input:
 
 - Two or more dotted versions in one string (e.g. `1.4.9 requires iOS 15.6`)
   are ambiguous → the parser returns `null` and the gate fails open.
-- A string with no dotted version parses only if it is a pure bare integer
-  (`2` → `2.0.0`); everything else → `null` → fail open.
+- Since 0.3.0, a Remote Config version value with no dotted core (e.g. a bare
+  `140`) is rejected → fail open. Build codes are not version names; always
+  enter a dotted version (`1.4.0`) in Remote Config.
 
 **Recommendation for releases:** still enter a clean `major.minor.patch`
 version string (e.g. `1.5.0`) in App Store Connect. Do not append the build
@@ -92,15 +94,11 @@ Supply a different `AppUpdateConfig`. No code changes. Add it to your
 
 ```yaml
 dependencies:
-  firebase_remote_update: ^0.2.0
+  firebase_remote_update: ^0.3.0
 ```
 
-Or via git:
+## Using an API instead of Remote Config?
 
-```yaml
-dependencies:
-  firebase_remote_update:
-    git:
-      url: https://github.com/rachadaccoumeh/firebase_remote_update.git
-      ref: v0.2.0
-```
+Use [`app_update_gate`](https://pub.dev/packages/app_update_gate) directly —
+the same gate, service, and store checks with an HTTP policy source you
+define (endpoint, auth, and JSON mapping), and no Firebase dependency.

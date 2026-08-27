@@ -1,39 +1,17 @@
+import 'package:app_update_gate/app_update_gate.dart' as core;
+import 'package:app_update_gate/app_update_gate.dart'
+    show UpdateDecision, UpdateGateMode;
 import 'package:flutter/material.dart';
 
 import 'app_update_service.dart';
-import 'update_decision.dart';
-
-/// Controls how [UpdateGate] behaves while the update policy is being
-/// evaluated.
-enum UpdateGateMode {
-  /// The app renders immediately and the policy is evaluated in the
-  /// background. If the result is [UpdateRequirement.forced], the gate swaps
-  /// to [UpdateGate.forcedBuilder] once evaluation completes.
-  ///
-  /// Use this when you want the user to see the app as fast as possible.
-  nonBlocking,
-
-  /// The app is hidden behind [UpdateGate.loadingBuilder] until evaluation
-  /// completes, then either [UpdateGate.child] or [UpdateGate.forcedBuilder]
-  /// is shown.
-  ///
-  /// Use this when you need the decision before any UI is visible (e.g. to
-  /// avoid a flash of the main screen before a forced update).
-  blocking,
-}
 
 /// Wraps the app and blocks it with [forcedBuilder] when a forced update is
 /// required. The policy check runs exactly once per mount.
 ///
-/// In [UpdateGateMode.nonBlocking] mode (the default) the app renders
-/// immediately and the policy is evaluated in the background. If the result is
-/// forced, the gate swaps to [forcedBuilder] after evaluation completes.
-///
-/// In [UpdateGateMode.blocking] mode the app is hidden behind [loadingBuilder]
-/// until the decision is resolved.
-///
-/// Optional updates never block: they are surfaced via [onDecision] so the
-/// host app can show its own soft prompt if desired.
+/// A thin wrapper over the `app_update_gate` core gate: it owns an internal
+/// single-check controller so the pre-0.3 service-based API keeps working.
+/// For background re-checks, observable status, or navigation-deferred
+/// presentation, use the core `AppUpdateController` + `UpdateGate` directly.
 class UpdateGate extends StatefulWidget {
   const UpdateGate({
     super.key,
@@ -73,57 +51,66 @@ class UpdateGate extends StatefulWidget {
   State<UpdateGate> createState() => _UpdateGateState();
 }
 
+/// Adapts this package's [AppUpdateService] to the core service interface so
+/// the core controller/gate can drive it.
+class _CoreServiceBridge implements core.AppUpdateService {
+  _CoreServiceBridge(this._service);
+
+  final AppUpdateService _service;
+
+  @override
+  core.AppUpdateConfig get config => core.AppUpdateConfig(
+    androidPackageId: _service.config.androidPackageId,
+    iosAppStoreId: _service.config.iosAppStoreId,
+    storeCountry: _service.config.storeCountry,
+    fetchTimeout: _service.config.fetchTimeout,
+  );
+
+  @override
+  Future<UpdateDecision> evaluate() => _service.evaluate();
+
+  @override
+  Future<void> startUpdate() => _service.startUpdate();
+}
+
 class _UpdateGateState extends State<UpdateGate> {
-  UpdateDecision? _decision;
-  bool _evaluating = true;
+  late core.AppUpdateController _controller;
 
   @override
   void initState() {
     super.initState();
-    _evaluate();
-  }
-
-  Future<void> _evaluate() async {
-    final decision = await widget.service.evaluate();
-    if (!mounted) return;
-    widget.onDecision?.call(decision);
-    setState(() {
-      _decision = decision;
-      _evaluating = false;
-    });
+    _controller = _createController();
   }
 
   @override
-  Widget build(BuildContext context) {
-    final decision = _decision;
-
-    switch (widget.mode) {
-      case UpdateGateMode.nonBlocking:
-        // Show the app immediately. Only swap to forcedBuilder once we know
-        // for certain that a forced update is required.
-        if (decision != null && decision.isForced) {
-          return widget.forcedBuilder(context, decision);
-        }
-        return widget.child;
-
-      case UpdateGateMode.blocking:
-        // Hide the app behind loadingBuilder until the decision is resolved.
-        if (_evaluating) {
-          return widget.loadingBuilder?.call(context) ?? const _Loading();
-        }
-        if (decision != null && decision.isForced) {
-          return widget.forcedBuilder(context, decision);
-        }
-        return widget.child;
+  void didUpdateWidget(UpdateGate oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.service != widget.service) {
+      _controller.dispose();
+      _controller = _createController();
     }
   }
-}
 
-class _Loading extends StatelessWidget {
-  const _Loading();
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  core.AppUpdateController _createController() {
+    // One check per mount, no background re-checks: pre-0.3 behavior.
+    return core.AppUpdateController(service: _CoreServiceBridge(widget.service));
+  }
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    return core.UpdateGate(
+      controller: _controller,
+      mode: widget.mode,
+      forcedBuilder: widget.forcedBuilder,
+      loadingBuilder: widget.loadingBuilder,
+      onDecision: widget.onDecision,
+      child: widget.child,
+    );
   }
 }
