@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_remote_update/firebase_remote_update.dart';
 import 'package:firebase_remote_config/firebase_remote_config.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -26,6 +28,20 @@ class _FakeRemoteConfig extends Fake implements FirebaseRemoteConfig {
 
   @override
   bool getBool(String key) => _bools[key] ?? false;
+
+  final updates = StreamController<RemoteConfigUpdate>();
+  var activations = 0;
+  Object? activateError;
+
+  @override
+  Stream<RemoteConfigUpdate> get onConfigUpdated => updates.stream;
+
+  @override
+  Future<bool> activate() async {
+    activations++;
+    if (activateError case final error?) throw error;
+    return true;
+  }
 }
 
 /// Store checker whose answer is fixed by the test.
@@ -182,6 +198,35 @@ void main() {
           ).evaluate();
 
       expect(decision.isNone, isTrue);
+    });
+  });
+
+  group('configUpdates', () {
+    test('activates the new values, then emits once per update', () async {
+      final remote = _FakeRemoteConfig();
+      final service = AppUpdateService(config: _config, remoteConfig: remote);
+      final events = <void>[];
+      final sub = service.configUpdates().listen(events.add);
+
+      remote.updates.add(RemoteConfigUpdate({'min_version'}));
+      await pumpEventQueue();
+
+      expect(remote.activations, 1);
+      expect(events, hasLength(1));
+      await sub.cancel();
+    });
+
+    test('an activate error is dropped (fail open)', () async {
+      final remote = _FakeRemoteConfig()..activateError = Exception('x');
+      final service = AppUpdateService(config: _config, remoteConfig: remote);
+      final errors = <Object>[];
+      final sub = service.configUpdates().listen((_) {}, onError: errors.add);
+
+      remote.updates.add(RemoteConfigUpdate({'min_version'}));
+      await pumpEventQueue();
+
+      expect(errors, isEmpty);
+      await sub.cancel();
     });
   });
 }

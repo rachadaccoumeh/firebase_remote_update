@@ -45,6 +45,33 @@ UpdateGate(
 
 Call `service.startUpdate()` from the update screen's button.
 
+### Re-checks (recommended)
+
+By default the policy is checked once per mount, and Remote Config caches
+values for `AppUpdateConfig.minimumFetchInterval` (1 hour). To make a forced
+update reach open apps fast:
+
+```dart
+const config = AppUpdateConfig(
+  androidPackageId: 'com.xxx.xxxxxxx',
+  iosAppStoreId: 'xxxxxxxxxxx',
+  minimumFetchInterval: Duration(minutes: 5),
+);
+
+UpdateGate(
+  service: AppUpdateService(config: config),
+  recheckInterval: const Duration(hours: 1),          // app stays open
+  resumeRecheckAfter: const Duration(minutes: 5),     // app comes back
+  listenForRealtimeUpdates: true,                     // console publish
+  forcedBuilder: ...,
+  child: myHome,
+);
+```
+
+Real-time Remote Config needs no extra setup in the Firebase console. It
+only works while the app is in the foreground; the resume check covers the
+rest.
+
 ### Modes
 
 | Mode | Behavior | When to use |

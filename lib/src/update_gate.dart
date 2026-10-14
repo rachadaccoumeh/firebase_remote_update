@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:app_update_gate/app_update_gate.dart' as core;
 import 'package:app_update_gate/app_update_gate.dart'
     show UpdateDecision, UpdateGateMode;
@@ -6,12 +8,18 @@ import 'package:flutter/material.dart';
 import 'app_update_service.dart';
 
 /// Wraps the app and blocks it with [forcedBuilder] when a forced update is
-/// required. The policy check runs exactly once per mount.
+/// required. The policy is checked once per mount, plus these optional
+/// triggers:
+/// - [recheckInterval]: periodic re-check while the app stays open;
+/// - [resumeRecheckAfter]: re-check when the app returns to the foreground and
+///   the last check is older than this;
+/// - [listenForRealtimeUpdates]: re-check as soon as a Remote Config change
+///   is published (Firebase real-time Remote Config).
 ///
 /// A thin wrapper over the `app_update_gate` core gate: it owns an internal
-/// single-check controller so the pre-0.3 service-based API keeps working.
-/// For background re-checks, observable status, or navigation-deferred
-/// presentation, use the core `AppUpdateController` + `UpdateGate` directly.
+/// controller so the service-based API keeps working. For observable status
+/// or navigation-deferred presentation, use the core `AppUpdateController` +
+/// `UpdateGate` directly.
 class UpdateGate extends StatefulWidget {
   const UpdateGate({
     super.key,
@@ -21,6 +29,9 @@ class UpdateGate extends StatefulWidget {
     this.mode = UpdateGateMode.nonBlocking,
     this.loadingBuilder,
     this.onDecision,
+    this.recheckInterval,
+    this.resumeRecheckAfter,
+    this.listenForRealtimeUpdates = false,
   });
 
   final AppUpdateService service;
@@ -46,6 +57,22 @@ class UpdateGate extends StatefulWidget {
   /// Called once with the resolved decision (useful for optional prompts,
   /// analytics, etc.).
   final void Function(UpdateDecision decision)? onDecision;
+
+  /// Re-checks the policy on this interval while the gate is mounted.
+  /// `null` (default) = no periodic re-check.
+  final Duration? recheckInterval;
+
+  /// When the app returns to the foreground, re-checks if the last check is
+  /// older than this. `null` (default) = no re-check on resume.
+  ///
+  /// Remote Config still caches values for
+  /// [AppUpdateConfig.minimumFetchInterval], so keep both values aligned.
+  final Duration? resumeRecheckAfter;
+
+  /// Re-checks at once when a Remote Config change is published, through
+  /// Firebase real-time Remote Config (no console setup needed). Defaults to
+  /// `false`.
+  final bool listenForRealtimeUpdates;
 
   @override
   State<UpdateGate> createState() => _UpdateGateState();
@@ -75,31 +102,47 @@ class _CoreServiceBridge implements core.AppUpdateService {
 
 class _UpdateGateState extends State<UpdateGate> {
   late core.AppUpdateController _controller;
+  StreamSubscription<void>? _configUpdates;
 
   @override
   void initState() {
     super.initState();
-    _controller = _createController();
+    _start();
   }
 
   @override
   void didUpdateWidget(UpdateGate oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.service != widget.service) {
-      _controller.dispose();
-      _controller = _createController();
+    if (oldWidget.service != widget.service ||
+        oldWidget.recheckInterval != widget.recheckInterval ||
+        oldWidget.listenForRealtimeUpdates != widget.listenForRealtimeUpdates) {
+      _stop();
+      _start();
     }
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _stop();
     super.dispose();
   }
 
-  core.AppUpdateController _createController() {
-    // One check per mount, no background re-checks: pre-0.3 behavior.
-    return core.AppUpdateController(service: _CoreServiceBridge(widget.service));
+  void _start() {
+    _controller = core.AppUpdateController(
+      service: _CoreServiceBridge(widget.service),
+      recheckInterval: widget.recheckInterval,
+    );
+    if (widget.listenForRealtimeUpdates) {
+      _configUpdates = widget.service.configUpdates().listen(
+        (_) => unawaited(_controller.checkForUpdate()),
+      );
+    }
+  }
+
+  void _stop() {
+    _configUpdates?.cancel();
+    _configUpdates = null;
+    _controller.dispose();
   }
 
   @override
@@ -110,6 +153,7 @@ class _UpdateGateState extends State<UpdateGate> {
       forcedBuilder: widget.forcedBuilder,
       loadingBuilder: widget.loadingBuilder,
       onDecision: widget.onDecision,
+      resumeRecheckAfter: widget.resumeRecheckAfter,
       child: widget.child,
     );
   }

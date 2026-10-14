@@ -4,7 +4,7 @@ description: >-
   Config. A thin adapter over app_update_gate, guarded by a real
   store-availability check (Play In-App Update on Android, iTunes lookup on
   iOS) so users are never locked out of a build that is not actually live.
-version: 0.3.0
+version: 0.3.1
 
 environment:
   sdk: ^3.7.2
@@ -15,7 +15,7 @@ dependencies:
     sdk: flutter
 
   # Source-agnostic core: service, gate widget, controller, store checks.
-  app_update_gate: ^0.1.1
+  app_update_gate: ^0.1.2
 
   # Policy source (pulls firebase_core transitively).
   firebase_remote_config: ^6.5.3

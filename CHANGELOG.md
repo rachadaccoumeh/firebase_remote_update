@@ -1,3 +1,19 @@
+## 0.3.1
+
+Faster update rollout: a forced update no longer waits up to 1 hour.
+
+- **New** `UpdateGate` options (all off by default, so 0.3.0 behavior stays):
+  - `recheckInterval` — re-check while the app stays open.
+  - `resumeRecheckAfter` — re-check when the app returns to the foreground
+    and the last check is older than this (needs `app_update_gate` 0.1.2).
+  - `listenForRealtimeUpdates` — re-check as soon as a Remote Config change
+    is published (Firebase real-time Remote Config; no console setup).
+- **New** `AppUpdateService.configUpdates()`: activated real-time updates as
+  a stream. Errors are logged and dropped (fail open).
+- Requires `app_update_gate: ^0.1.2`.
+- Custom classes that `implements AppUpdateService` (test fakes) must add
+  `configUpdates()`.
+
 ## 0.3.0
 
 **Rebuilt as a thin adapter over `app_update_gate`** — the source-agnostic

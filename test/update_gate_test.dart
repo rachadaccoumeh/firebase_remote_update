@@ -20,12 +20,19 @@ class _FakeUpdateService implements AppUpdateService {
 
   @override
   Future<UpdateDecision> evaluate() async {
+    evaluations++;
     await completer.future;
     return decision;
   }
 
   @override
   Future<void> startUpdate() async {}
+
+  final updates = StreamController<void>.broadcast();
+  var evaluations = 0;
+
+  @override
+  Stream<void> configUpdates() => updates.stream;
 }
 
 const _childKey = Key('child');
@@ -318,6 +325,68 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(called, isFalse);
+    });
+  });
+
+  group('UpdateGate — re-checks', () {
+    Future<_FakeUpdateService> pumpGate(
+      WidgetTester tester, {
+      Duration? recheckInterval,
+      bool listen = false,
+    }) async {
+      final service = _FakeUpdateService(
+        const UpdateDecision.none(),
+        Completer<void>()..complete(),
+      );
+      await tester.pumpWidget(
+        _wrap(
+          UpdateGate(
+            service: service,
+            forcedBuilder: _forcedBuilder,
+            recheckInterval: recheckInterval,
+            listenForRealtimeUpdates: listen,
+            child: _child(),
+          ),
+        ),
+      );
+      await tester.pump();
+      return service;
+    }
+
+    testWidgets('a published config update re-checks at once', (tester) async {
+      final service = await pumpGate(tester, listen: true);
+      expect(service.evaluations, 1);
+
+      service.updates.add(null);
+      await tester.pump();
+
+      expect(service.evaluations, 2);
+    });
+
+    testWidgets('config updates are ignored unless listening', (tester) async {
+      final service = await pumpGate(tester);
+      expect(service.updates.hasListener, isFalse);
+    });
+
+    testWidgets('re-checks on the recheck interval', (tester) async {
+      final service = await pumpGate(
+        tester,
+        recheckInterval: const Duration(hours: 1),
+      );
+      expect(service.evaluations, 1);
+
+      await tester.pump(const Duration(hours: 1));
+      expect(service.evaluations, 2);
+
+      await tester.pumpWidget(_wrap(const SizedBox()));
+    });
+
+    testWidgets('unmount stops listening for config updates', (tester) async {
+      final service = await pumpGate(tester, listen: true);
+      expect(service.updates.hasListener, isTrue);
+
+      await tester.pumpWidget(_wrap(const SizedBox()));
+      expect(service.updates.hasListener, isFalse);
     });
   });
 }
